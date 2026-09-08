@@ -1,0 +1,17 @@
+# Build artifacts
+/tinysim
+/run_tests
+/visual_check
+*.dSYM/
+*.o
+*.d
+
+# macOS
+.DS_Store
+
+# Editor / tooling
+.cache/
+compile_commands.json
+
+
+# TinySim2D\ Spec\ Sheet.md
