@@ -13,6 +13,12 @@ TEST_DIR := tests
 
 # Physics core: no SFML, linked into both binaries.
 LIB_SRCS := $(SRC_DIR)/Vec2.cpp \
+			$(SRC_DIR)/Transform.cpp \
+			$(SRC_DIR)/Shape.cpp \
+			$(SRC_DIR)/BoxShape.cpp \
+			$(SRC_DIR)/CircleShape.cpp \
+			$(SRC_DIR)/Simplex.cpp \
+			$(SRC_DIR)/GJK.cpp \
 			$(SRC_DIR)/RigidBody.cpp \
 			$(SRC_DIR)/World.cpp
 
@@ -28,12 +34,20 @@ TEST_SRCS := $(TEST_DIR)/test_main.cpp \
 				$(TEST_DIR)/test_rigidbody.cpp \
 				$(TEST_DIR)/test_vec2.cpp \
 				$(TEST_DIR)/test_world.cpp \
-				$(TEST_DIR)/test_renderer.cpp
+				$(TEST_DIR)/test_renderer.cpp \
+				$(TEST_DIR)/test_geometry.cpp \
+				$(TEST_DIR)/test_collision.cpp
 
 CORE_HEADERS := include/Vec2.h \
+				include/Transform.h \
 				include/RigidBody.h \
 				include/World.h \
-				include/Shape.h
+				include/Shape.h \
+				include/BoxShape.h \
+				include/CircleShape.h \
+				include/Simplex.h \
+				include/Collision.h \
+				include/GJK.h
 GFX_HEADERS  := include/Renderer.h
 
 PROG_BIN := tinysim

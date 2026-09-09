@@ -14,6 +14,10 @@ float Vec2::getY() const {
     return y;
 }
 
+Vec2 Vec2::operator-() const {
+    return Vec2(-x, -y);
+}
+
 Vec2 Vec2::operator+(const Vec2& other) const {
     return Vec2(x + other.x, y + other.y);
 }
@@ -48,6 +52,22 @@ float dot(const Vec2& a, const Vec2& b) {
 
 float cross(const Vec2& a, const Vec2& b) {
     return a.getX() * b.getY() - a.getY() * b.getX();
+}
+
+Vec2 cross(const Vec2& v, float s)
+{
+    return Vec2(
+         s * v.getY(),
+        -s * v.getX()
+    );
+}
+
+Vec2 cross(float s, const Vec2& v)
+{
+    return Vec2(
+        -s * v.getY(),
+         s * v.getX()
+    );
 }
 
 float d2(const Vec2& v) {

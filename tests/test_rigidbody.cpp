@@ -73,6 +73,9 @@ struct ProbeShape : Shape {
     }
     ~ProbeShape() override { *destroyed = true; }
     float calculateInertia(float mass) const override { return mass; }
+    Vec2 support(const Vec2 &, const Vec2 &position, float) const override {
+        return position;
+    }
 };
 }  // namespace
 

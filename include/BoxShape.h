@@ -18,6 +18,8 @@ class BoxShape : public Shape {
 
     float getWidth() const { return width; }
     float getHeight() const { return height; }
+
+    Vec2 support(const Vec2 &direction, const Vec2 &position, float orientation) const override;
 };
 
 #endif // BOX_SHAPE_H
