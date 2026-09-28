@@ -1,54 +1,38 @@
 CXX := clang++
-CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic -g -Iinclude -I.
 
-# SFML via Homebrew. Asking brew for the prefix keeps this working on both
-# Apple Silicon (/opt/homebrew) and Intel (/usr/local), and survives version
-# bumps. ':=' so brew runs once per make, not once per rule.
+CPPFLAGS := -Iinclude -Itests
+CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic -g
+
+# SFML via Homebrew. Resolving the prefix once keeps the build portable across
+# Apple Silicon and Intel Homebrew installations.
 SFML_PREFIX := $(shell brew --prefix sfml)
-SFML_CFLAGS := -isystem $(SFML_PREFIX)/include
-SFML_LIBS   := -L$(SFML_PREFIX)/lib -lsfml-graphics -lsfml-window -lsfml-system
+SFML_CPPFLAGS := -isystem $(SFML_PREFIX)/include
+SFML_LIBS := -L$(SFML_PREFIX)/lib -lsfml-graphics -lsfml-window -lsfml-system
 
 SRC_DIR := src
 TEST_DIR := tests
+BUILD_DIR := build
 
-# Physics core: no SFML, linked into both binaries.
-LIB_SRCS := $(SRC_DIR)/Vec2.cpp \
-			$(SRC_DIR)/Transform.cpp \
-			$(SRC_DIR)/Shape.cpp \
-			$(SRC_DIR)/BoxShape.cpp \
-			$(SRC_DIR)/CircleShape.cpp \
-			$(SRC_DIR)/Simplex.cpp \
-			$(SRC_DIR)/GJK.cpp \
-			$(SRC_DIR)/RigidBody.cpp \
-			$(SRC_DIR)/World.cpp
+# Source discovery follows the module layout. Adding a .cpp file to one of
+# these directories automatically includes it in the appropriate target.
+CORE_SRCS := $(sort $(wildcard \
+	$(SRC_DIR)/math/*.cpp \
+	$(SRC_DIR)/geometry/*.cpp \
+	$(SRC_DIR)/collision/*.cpp \
+	$(SRC_DIR)/dynamics/*.cpp))
+RENDER_SRCS := $(wildcard $(SRC_DIR)/rendering/*.cpp)
+APP_SRCS := $(wildcard $(SRC_DIR)/app/*.cpp)
 
-# Rendering: needs SFML, linked into tinysim only. Keeping this out of
-# LIB_SRCS is what lets the tests stay headless and SFML-free.
-GFX_SRCS := $(SRC_DIR)/Renderer.cpp
+TEST_SRCS := $(filter-out $(TEST_DIR)/visual/%,$(wildcard $(TEST_DIR)/*/*.cpp))
+VISUAL_SRCS := $(wildcard $(TEST_DIR)/visual/*.cpp)
 
-MAIN_SRCS := $(SRC_DIR)/main.cpp
+CORE_OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(CORE_SRCS))
+RENDER_OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(RENDER_SRCS))
+APP_OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(APP_SRCS))
+TEST_OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(TEST_SRCS))
+VISUAL_OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(VISUAL_SRCS))
 
-# Eyeball harness: its own main(), so it must stay out of TEST_SRCS.
-VISUAL_SRCS := $(TEST_DIR)/visual_check.cpp
-TEST_SRCS := $(TEST_DIR)/test_main.cpp \
-				$(TEST_DIR)/test_rigidbody.cpp \
-				$(TEST_DIR)/test_vec2.cpp \
-				$(TEST_DIR)/test_world.cpp \
-				$(TEST_DIR)/test_renderer.cpp \
-				$(TEST_DIR)/test_geometry.cpp \
-				$(TEST_DIR)/test_collision.cpp
-
-CORE_HEADERS := include/Vec2.h \
-				include/Transform.h \
-				include/RigidBody.h \
-				include/World.h \
-				include/Shape.h \
-				include/BoxShape.h \
-				include/CircleShape.h \
-				include/Simplex.h \
-				include/Collision.h \
-				include/GJK.h
-GFX_HEADERS  := include/Renderer.h
+ALL_OBJS := $(CORE_OBJS) $(RENDER_OBJS) $(APP_OBJS) $(TEST_OBJS) $(VISUAL_OBJS)
 
 PROG_BIN := tinysim
 TEST_BIN := run_tests
@@ -60,20 +44,28 @@ all: build
 
 build: $(PROG_BIN)
 
-$(PROG_BIN): $(LIB_SRCS) $(GFX_SRCS) $(MAIN_SRCS) $(CORE_HEADERS) $(GFX_HEADERS)
-	$(CXX) $(CXXFLAGS) $(SFML_CFLAGS) $(LIB_SRCS) $(GFX_SRCS) $(MAIN_SRCS) $(SFML_LIBS) -o $@
+$(PROG_BIN): $(CORE_OBJS) $(RENDER_OBJS) $(APP_OBJS)
+	$(CXX) $^ $(SFML_LIBS) -o $@
 
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
-$(TEST_BIN): $(LIB_SRCS) $(GFX_SRCS) $(TEST_SRCS) $(CORE_HEADERS) $(GFX_HEADERS) $(TEST_DIR)/test_utils.h
-	$(CXX) $(CXXFLAGS) $(SFML_CFLAGS) $(LIB_SRCS) $(GFX_SRCS) $(TEST_SRCS) $(SFML_LIBS) -o $@
+$(TEST_BIN): $(CORE_OBJS) $(RENDER_OBJS) $(TEST_OBJS)
+	$(CXX) $^ $(SFML_LIBS) -o $@
 
 visual: $(VISUAL_BIN)
 	./$(VISUAL_BIN)
 
-$(VISUAL_BIN): $(LIB_SRCS) $(GFX_SRCS) $(VISUAL_SRCS) $(CORE_HEADERS) $(GFX_HEADERS)
-	$(CXX) $(CXXFLAGS) $(SFML_CFLAGS) $(LIB_SRCS) $(GFX_SRCS) $(VISUAL_SRCS) $(SFML_LIBS) -o $@
+$(VISUAL_BIN): $(CORE_OBJS) $(RENDER_OBJS) $(VISUAL_OBJS)
+	$(CXX) $^ $(SFML_LIBS) -o $@
+
+$(BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(SFML_CPPFLAGS) -MMD -MP -c $< -o $@
+
+-include $(ALL_OBJS:.o=.d)
 
 clean:
-	rm -rf $(PROG_BIN) $(TEST_BIN) $(VISUAL_BIN) $(PROG_BIN).dSYM $(TEST_BIN).dSYM $(VISUAL_BIN).dSYM
+	rm -rf $(BUILD_DIR) \
+		$(PROG_BIN) $(TEST_BIN) $(VISUAL_BIN) \
+		$(PROG_BIN).dSYM $(TEST_BIN).dSYM $(VISUAL_BIN).dSYM

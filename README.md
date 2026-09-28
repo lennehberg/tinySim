@@ -65,8 +65,9 @@ The `SpecAcceptance` suite maps directly onto section 10 of the spec sheet:
 - **Test D** — force offset from the centre of mass: both linear *and* angular
   acceleration.
 
-Adding a test file means dropping it in `tests/` and adding it to `TEST_SRCS`
-in the Makefile. Tests never open a window, so they run headless.
+Adding a test file under the matching `tests/<module>/` directory is enough for
+the Makefile to discover it automatically. Tests never open a window, so they
+run headless.
 
 ## Visual check
 
@@ -89,16 +90,18 @@ negative one spins clockwise (right).
 ## Layout
 
 ```
-include/     public headers
-  Vec2.h         2D vector maths
-  Shape.h        abstract shape + ShapeType enum
-  BoxShape.h     rectangle, inertia = 1/12 m (w^2 + h^2)
-  CircleShape.h  circle, inertia = 1/2 m r^2
-  RigidBody.h    physical state; owns its Shape
-  World.h        owns bodies, applies gravity, advances the simulation
-  Renderer.h     SFML window and drawing
-src/         implementations + main.cpp
-tests/       unit tests and the visual harness
+include/tinysim/       public headers, grouped by module
+  math/                vectors and transforms
+  geometry/            shapes and shape interfaces
+  collision/           GJK, EPA, simplex and collision results
+  dynamics/            rigid bodies and the simulation world
+  rendering/           SFML renderer
+src/                   implementations, mirroring the header modules
+  app/                 executable entry point
+tests/                 tests grouped by the same modules
+  support/             shared test harness
+  visual/              interactive visual check
+build/                 generated objects and dependency files
 ```
 
 The physics core (`Vec2`, `Shape`, `RigidBody`, `World`) has no SFML
