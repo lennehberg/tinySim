@@ -370,3 +370,83 @@ TEST(Contact, PushingOutByDepthResolvesPenetration) {
         CHECK(contact(pair.a, partial).colliding);
     }
 }
+
+// --- contact points ---------------------------------------------------------
+
+TEST(ContactPoints, SeparatedBodiesHaveNoPoints) {
+    const Collision c = contact(makeBox(Vec2(), 2.0f, 2.0f),
+                                makeBox(Vec2(5.0f, 0.0f), 2.0f, 2.0f));
+    CHECK(!c.colliding);
+    CHECK(c.contactPoints.empty());
+}
+
+TEST(ContactPoints, FaceOverlapHasTwoPoints) {
+    const Collision c = contact(makeBox(Vec2(), 2.0f, 2.0f),
+                                makeBox(Vec2(1.5f, 0.0f), 2.0f, 2.0f));
+    CHECK(c.colliding);
+    CHECK(c.contactPoints.size() == 2);
+    CHECK_NEAR(c.contactPoints[0].getX(), c.contactPoints[1].getX(), kBoxEps);
+    CHECK_NEAR(std::fabs(c.contactPoints[0].getY()), 1.0f, kBoxEps);
+    CHECK_NEAR(std::fabs(c.contactPoints[1].getY()), 1.0f, kBoxEps);
+    CHECK(c.contactPoints[0].getY() * c.contactPoints[1].getY() < 0.0f);
+}
+
+TEST(ContactPoints, ClippingKeepsPointsWithinBothFaces) {
+    const Collision c = contact(makeBox(Vec2(), 2.0f, 2.0f),
+                                makeBox(Vec2(0.75f, 1.5f), 2.0f, 2.0f));
+    CHECK(c.colliding);
+    CHECK(c.contactPoints.size() == 2);
+    for (const Vec2 &point : c.contactPoints) {
+        CHECK(point.getX() >= -0.25f - kBoxEps);
+        CHECK(point.getX() <= 1.0f + kBoxEps);
+    }
+}
+
+TEST(ContactPoints, CirclePairHasOneMidpoint) {
+    const Collision c = contact(makeCircle(Vec2(), 2.0f),
+                                makeCircle(Vec2(1.0f, 0.0f), 2.0f));
+    CHECK(c.colliding);
+    CHECK(c.contactPoints.size() == 1);
+    CHECK_VEC_NEAR(c.contactPoints[0], 0.5f, 0.0f);
+}
+
+TEST(ContactPoints, CircleBoxHasOnePointInEitherBodyOrder) {
+    const RigidBody circle = makeCircle(Vec2(), 1.0f);
+    const RigidBody box = makeBox(Vec2(1.5f, 0.0f), 2.0f, 2.0f);
+    const Collision cb = contact(circle, box);
+    const Collision bc = contact(box, circle);
+    CHECK(cb.contactPoints.size() == 1);
+    CHECK(bc.contactPoints.size() == 1);
+    CHECK_NEAR(cb.contactPoints[0].getX(), 1.0f, kCircleEps);
+    CHECK_NEAR(bc.contactPoints[0].getX(), 1.0f, kCircleEps);
+    CHECK_NEAR(cb.contactPoints[0].getY(), 0.0f, kCircleEps);
+    CHECK_NEAR(bc.contactPoints[0].getY(), 0.0f, kCircleEps);
+}
+
+TEST(ContactPoints, RotatedCornerHasOnePoint) {
+    const Collision c = contact(makeBox(Vec2(), 2.0f, 2.0f, kPi / 4.0f),
+                                makeBox(Vec2(2.2f, 0.0f), 2.0f, 2.0f));
+    CHECK(c.colliding);
+    CHECK(c.contactPoints.size() == 1);
+    CHECK_NEAR(c.contactPoints[0].getX(), std::sqrt(2.0f), kBoxEps);
+    CHECK_NEAR(c.contactPoints[0].getY(), 0.0f, kBoxEps);
+}
+
+TEST(ContactPoints, FlatBoxCanProvideTwoContacts) {
+    const Collision c = contact(makeBox(Vec2(), 0.0f, 2.0f, kPi / 2.0f),
+                                makeBox(Vec2(0.0f, -0.5f), 2.0f, 2.0f));
+    CHECK(c.colliding);
+    CHECK(c.contactPoints.size() == 2);
+    CHECK_NEAR(std::fabs(c.contactPoints[0].getX()), 1.0f, kBoxEps);
+    CHECK_NEAR(std::fabs(c.contactPoints[1].getX()), 1.0f, kBoxEps);
+    CHECK(c.contactPoints[0].getX() * c.contactPoints[1].getX() < 0.0f);
+}
+
+TEST(ContactPoints, PenetratingPairsProducePoints) {
+    for (const Pair &pair : penetratingPairs()) {
+        const Collision c = contact(pair.a, pair.b);
+        CHECK(c.colliding);
+        CHECK(!c.contactPoints.empty());
+        CHECK(c.contactPoints.size() <= 2);
+    }
+}

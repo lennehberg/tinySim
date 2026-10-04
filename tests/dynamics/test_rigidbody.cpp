@@ -76,6 +76,13 @@ struct ProbeShape : Shape {
     Vec2 support(const Vec2 &, const Vec2 &position, float) const override {
         return position;
     }
+    Feature supportFeature(const Vec2 &, const Vec2 &position,
+                           float) const override {
+        Feature feature{};
+        feature.vertices[0].position = position;
+        feature.count = 1;
+        return feature;
+    }
 };
 }  // namespace
 

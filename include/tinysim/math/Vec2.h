@@ -32,6 +32,8 @@ public:
 
     float& operator[](std::size_t index);
     const float& operator[](std::size_t index) const;
+
+    Vec2 normalize() const;
 };
 
 // dot product of two vectors

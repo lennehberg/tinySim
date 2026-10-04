@@ -14,6 +14,22 @@
 
 namespace {
 constexpr float kPi = 3.14159265f;
+
+bool near(const Vec2 &a, const Vec2 &b, float eps = 1e-3f) {
+    return std::fabs(a.getX() - b.getX()) <= eps &&
+           std::fabs(a.getY() - b.getY()) <= eps;
+}
+
+// An edge feature is the segment between its two vertices; which end comes
+// first is an implementation detail, so compare in either order.
+bool isEdgeBetween(const Feature &feature, const Vec2 &p, const Vec2 &q) {
+    if (feature.count != 2) {
+        return false;
+    }
+    const Vec2 &a = feature.vertices[0].position;
+    const Vec2 &b = feature.vertices[1].position;
+    return (near(a, p) && near(b, q)) || (near(a, q) && near(b, p));
+}
 }  // namespace
 
 // --- rotate -----------------------------------------------------------------
@@ -181,6 +197,157 @@ TEST(Support, SquareSupportUnderQuarterTurnKeepsSameReach) {
     CHECK_NEAR(
         square.support(Vec2(1.0f, 0.0f), Vec2(0.0f, 0.0f), kPi / 2.0f).getX(),
         1.0f, 1e-3f);
+}
+
+// --- CircleShape::supportFeature --------------------------------------------
+
+// A circle has no flat faces, so its support feature is always a single point.
+TEST(SupportFeature, CircleFeatureIsASinglePoint) {
+    const CircleShape circle(2.0f);
+    Feature feature =
+        circle.supportFeature(Vec2(1.0f, 0.0f), Vec2(5.0f, 0.0f), 0.0f);
+    CHECK(feature.isPoint());
+    CHECK(!feature.isEdge());
+    CHECK_VEC_NEAR(feature.vertices[0].position, 7.0f, 0.0f);
+}
+
+TEST(SupportFeature, CircleFeatureMatchesSupport) {
+    const CircleShape circle(1.5f);
+    const Vec2 position(-3.0f, 4.0f);
+    const Vec2 directions[] = {Vec2(1.0f, 0.0f), Vec2(0.0f, -1.0f),
+                               Vec2(3.0f, 4.0f), Vec2(-2.0f, 0.5f)};
+    for (const Vec2 &direction : directions) {
+        const Feature feature =
+            circle.supportFeature(direction, position, 0.7f);
+        const Vec2 expected = circle.support(direction, position, 0.7f);
+        CHECK_VEC_NEAR(feature.vertices[0].position, expected.getX(),
+                       expected.getY());
+    }
+}
+
+TEST(SupportFeature, CircleFeatureWithZeroDirectionIsTheCentre) {
+    const CircleShape circle(2.0f);
+    Feature feature =
+        circle.supportFeature(Vec2(0.0f, 0.0f), Vec2(5.0f, -1.0f), 0.0f);
+    CHECK(feature.isPoint());
+    CHECK_VEC_NEAR(feature.vertices[0].position, 5.0f, -1.0f);
+}
+
+// --- BoxShape::supportFeature -----------------------------------------------
+
+// Along each face normal the support feature is that whole face.
+TEST(SupportFeature, BoxFeatureAlongFaceNormalsIsThatFace) {
+    const BoxShape box(4.0f, 2.0f);  // half extents (2, 1)
+    const Vec2 origin(0.0f, 0.0f);
+
+    CHECK(isEdgeBetween(box.supportFeature(Vec2(1.0f, 0.0f), origin, 0.0f),
+                        Vec2(2.0f, 1.0f), Vec2(2.0f, -1.0f)));
+    CHECK(isEdgeBetween(box.supportFeature(Vec2(-1.0f, 0.0f), origin, 0.0f),
+                        Vec2(-2.0f, 1.0f), Vec2(-2.0f, -1.0f)));
+    CHECK(isEdgeBetween(box.supportFeature(Vec2(0.0f, 1.0f), origin, 0.0f),
+                        Vec2(2.0f, 1.0f), Vec2(-2.0f, 1.0f)));
+    CHECK(isEdgeBetween(box.supportFeature(Vec2(0.0f, -1.0f), origin, 0.0f),
+                        Vec2(2.0f, -1.0f), Vec2(-2.0f, -1.0f)));
+}
+
+// Off-axis, the chosen face is the one whose normal is closest to the
+// direction -- i.e. the edge most perpendicular to it.
+TEST(SupportFeature, BoxFeaturePicksFaceMostFacingTheDirection) {
+    const BoxShape box(2.0f, 2.0f);
+    const Vec2 origin(0.0f, 0.0f);
+
+    CHECK(isEdgeBetween(box.supportFeature(Vec2(1.0f, 0.3f), origin, 0.0f),
+                        Vec2(1.0f, 1.0f), Vec2(1.0f, -1.0f)));
+    CHECK(isEdgeBetween(box.supportFeature(Vec2(0.3f, 1.0f), origin, 0.0f),
+                        Vec2(1.0f, 1.0f), Vec2(-1.0f, 1.0f)));
+    CHECK(isEdgeBetween(box.supportFeature(Vec2(-1.0f, -0.3f), origin, 0.0f),
+                        Vec2(-1.0f, 1.0f), Vec2(-1.0f, -1.0f)));
+    CHECK(isEdgeBetween(box.supportFeature(Vec2(-0.3f, -1.0f), origin, 0.0f),
+                        Vec2(1.0f, -1.0f), Vec2(-1.0f, -1.0f)));
+}
+
+// The face choice depends on the direction only, not on how long each edge
+// is. A wide box seen from mostly-above still presents its top face...
+TEST(SupportFeature, WideBoxFeatureDoesNotDependOnEdgeLength) {
+    const BoxShape box(4.0f, 2.0f);  // half extents (2, 1)
+    CHECK(isEdgeBetween(
+        box.supportFeature(Vec2(0.6f, 0.8f), Vec2(0.0f, 0.0f), 0.0f),
+        Vec2(2.0f, 1.0f), Vec2(-2.0f, 1.0f)));
+}
+
+// ...and a tall box seen from mostly-right still presents its right face.
+TEST(SupportFeature, TallBoxFeatureDoesNotDependOnEdgeLength) {
+    const BoxShape box(2.0f, 4.0f);  // half extents (1, 2)
+    CHECK(isEdgeBetween(
+        box.supportFeature(Vec2(0.8f, 0.6f), Vec2(0.0f, 0.0f), 0.0f),
+        Vec2(1.0f, 2.0f), Vec2(1.0f, -2.0f)));
+}
+
+// The feature always contains the support point.
+TEST(SupportFeature, BoxFeatureContainsTheSupportPoint) {
+    const BoxShape box(3.0f, 1.0f);
+    const Vec2 position(2.0f, -1.0f);
+    const float orientation = 0.4f;
+    const Vec2 directions[] = {Vec2(1.0f, 0.0f), Vec2(0.0f, 1.0f),
+                               Vec2(-1.0f, 0.2f), Vec2(0.3f, -0.9f),
+                               Vec2(-0.7f, -0.7f)};
+    for (const Vec2 &direction : directions) {
+        const Feature feature =
+            box.supportFeature(direction, position, orientation);
+        const Vec2 expected = box.support(direction, position, orientation);
+        CHECK(near(feature.vertices[0].position, expected) ||
+              (feature.count == 2 &&
+               near(feature.vertices[1].position, expected)));
+    }
+}
+
+TEST(SupportFeature, BoxFeatureIsOffsetByPosition) {
+    const BoxShape box(4.0f, 2.0f);
+    CHECK(isEdgeBetween(
+        box.supportFeature(Vec2(1.0f, 0.0f), Vec2(10.0f, 20.0f), 0.0f),
+        Vec2(12.0f, 21.0f), Vec2(12.0f, 19.0f)));
+}
+
+TEST(SupportFeature, BoxFeatureIsUnaffectedByDirectionMagnitude) {
+    const BoxShape box(4.0f, 2.0f);
+    CHECK(isEdgeBetween(
+        box.supportFeature(Vec2(300.0f, 400.0f), Vec2(0.0f, 0.0f), 0.0f),
+        Vec2(2.0f, 1.0f), Vec2(-2.0f, 1.0f)));
+}
+
+// A 4x2 box turned a quarter turn stands upright, so looking straight up hits
+// its short local +x face, which now spans x in [-1, 1] at y = 2.
+TEST(SupportFeature, BoxFeatureHonoursOrientation) {
+    const BoxShape box(4.0f, 2.0f);
+    CHECK(isEdgeBetween(
+        box.supportFeature(Vec2(0.0f, 1.0f), Vec2(0.0f, 0.0f), kPi / 2.0f),
+        Vec2(-1.0f, 2.0f), Vec2(1.0f, 2.0f)));
+}
+
+// A 2x2 box turned 45 degrees presents an edge to a direction along one of its
+// own face normals, not to the world axes.
+TEST(SupportFeature, RotatedBoxFeatureFollowsItsOwnFaceNormal) {
+    const BoxShape box(2.0f, 2.0f);
+    const float r = std::sqrt(2.0f);
+    CHECK(isEdgeBetween(
+        box.supportFeature(Vec2(1.0f, 1.0f), Vec2(0.0f, 0.0f), kPi / 4.0f),
+        Vec2(0.0f, r), Vec2(r, 0.0f)));
+}
+
+// A zero-size box is a single point; it has no edge to report.
+TEST(SupportFeature, ZeroSizeBoxFeatureIsASinglePoint) {
+    const BoxShape box(0.0f, 0.0f);
+    Feature feature =
+        box.supportFeature(Vec2(1.0f, 1.0f), Vec2(3.0f, 4.0f), 0.0f);
+    CHECK(feature.isPoint());
+    CHECK_VEC_NEAR(feature.vertices[0].position, 3.0f, 4.0f);
+}
+
+TEST(SupportFeature, ZeroWidthBoxFeatureKeepsItsSegment) {
+    const BoxShape box(0.0f, 2.0f);
+    CHECK(isEdgeBetween(
+        box.supportFeature(Vec2(1.0f, 0.0f), Vec2(3.0f, 4.0f), 0.0f),
+        Vec2(3.0f, 3.0f), Vec2(3.0f, 5.0f)));
 }
 
 // --- Simplex ----------------------------------------------------------------

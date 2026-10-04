@@ -19,6 +19,7 @@ class CircleShape : public Shape {
     float getRadius() const { return radius; }
 
     Vec2 support(const Vec2 &direction, const Vec2 &position, float orientation) const override;
+    Feature supportFeature(const Vec2 &direction, const Vec2 &position, float orientation) const override;
 };
 
 #endif // CIRCLE_SHAPE_H

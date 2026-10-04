@@ -24,7 +24,7 @@ Vec2 fallbackContactNormal(const RigidBody *bodyA,
 
     if (d2(longestEdge) >= EPS_SQUARED) {
         Vec2 normal(longestEdge.getY(), -longestEdge.getX());
-        normal = normal * (1.0f / std::sqrt(d2(normal)));
+        normal = normal.normalize();
 
         if (dot(normal, centerDirection) < 0.0f) {
             normal = -normal;
@@ -34,7 +34,7 @@ Vec2 fallbackContactNormal(const RigidBody *bodyA,
     }
 
     if (d2(centerDirection) >= EPS_SQUARED) {
-        return centerDirection * (1.0f / std::sqrt(d2(centerDirection)));
+        return centerDirection.normalize();
     }
 
     return Vec2(1.0f, 0.0f);
@@ -74,7 +74,7 @@ std::optional<std::vector<Vec2>> buildInitialPolytope(const RigidBody *bodyA, co
 
         // compute perpendicular to edge
         Vec2 perp(e.getY(), -e.getX());
-        perp = perp * (1.0f / std::sqrt(eLengthSquare));
+        perp = perp.normalize();
 
         // try both sides
         Vec2 positiveSupport = support(bodyA, bodyB, perp);
@@ -88,6 +88,89 @@ std::optional<std::vector<Vec2>> buildInitialPolytope(const RigidBody *bodyA, co
         return windTriangleCounterClockWise(a, b, c);
     }
     return std::nullopt;
+}
+
+std::vector<Vec2> clip(const Vec2 &v1, const Vec2 &v2, Vec2 normal, double o) {
+    std::vector<Vec2> clippedPoints;
+
+    double d1 = dot(normal, v1) - o;
+    double d2 = dot(normal, v2) - o;
+
+    // if either points is past o along n,
+    // we can keep the point
+    if (d1 >= 0.0f) {
+        clippedPoints.push_back(v1);
+    }
+    if (d2 >= 0.0f) {
+        clippedPoints.push_back(v2);
+    }
+
+    // check if on opposite sides to compute the correct point
+    if (d1 * d2 < 0.0f) {
+        Vec2 e = v2 - v1;
+        // compute the location along e
+        double u = d1 / (d1 - d2);
+        Vec2 intersection = v1 + e * u;
+        clippedPoints.push_back(intersection);
+    }
+    return clippedPoints;
+}
+
+std::vector<Vec2> clipEdges(const Feature &ref, const Feature &inc, bool flip) {
+    std::vector<Vec2> clippedPoints;
+
+    // get the reference edge from the feature
+    Vec2 refv = ref.vertices[1].position - ref.vertices[0].position;
+    refv.normalize();
+
+    double o1 = dot(refv, ref.vertices[0].position);
+    // clip the incident edge against the reference edge
+    clippedPoints = clip(inc.vertices[0].position, inc.vertices[1].position, refv, o1);
+
+    // if we have less than 2 points, fail the clipping
+    if (clippedPoints.size() < 2) {
+        return {};
+    }
+
+    // clip against the other side of the reference edge
+    Vec2 refNorm = Vec2(-refv.getY(), refv.getX());
+    // if we flipped the edges, negate the reference normal
+    if (flip) {
+        refNorm = -refNorm;
+    }
+
+    // get the largest depth
+    double max = dot(refNorm, ref.vertices[0].position);
+    // make sure the final points are not past the max
+    if (dot(refNorm, clippedPoints[0]) - max < 0.0f) {
+        clippedPoints.erase(clippedPoints.begin());
+    }
+    if (dot(refNorm, clippedPoints[1]) - max < 0.0f) {
+        clippedPoints.erase(clippedPoints.begin() + 1);
+    }
+    return clippedPoints;
+}
+
+std::vector<Vec2> getCollisionPoints(const RigidBody *A, const RigidBody *B, const Vec2 &normal) {
+    Feature featureA = A->getShape()->supportFeature(normal, A->getPosition(), A->getOrientation());
+    Feature featureB = B->getShape()->supportFeature(-normal, B->getPosition(), B->getOrientation());
+    bool flip = false;
+    Feature ref, inc;
+
+    // find the reference edge and incident edge (if both features are edges)
+    if (featureA.isEdge() && featureB.isEdge()) {
+        // the reference edge is the most perpendicular to the collision normal
+        if (std::fabs(dot(normal, (featureA.vertices[1].position - featureA.vertices[0].position).normalize())) <
+            std::fabs(dot(normal, (featureB.vertices[1].position - featureB.vertices[0].position).normalize()))) {
+            ref = featureA;
+            inc = featureB;
+        } else {
+            flip = true;
+            ref = featureB;
+            inc = featureA;
+        }
+    }
+    return clipEdges(ref, inc, flip);
 }
 
 Collision detectCollision(const RigidBody *bodyA, const RigidBody *bodyB){
@@ -104,7 +187,7 @@ Collision detectCollision(const RigidBody *bodyA, const RigidBody *bodyB){
         if (d2(normal) < EPS_SQUARED){
             normal = Vec2(1.0f, 0.0f);
         } else {
-            normal = normal * (1.0f / std::sqrt(d2(normal)));
+            normal = normal.normalize();
         }
 
         return {true, normal, 0};

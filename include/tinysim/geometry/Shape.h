@@ -2,6 +2,7 @@
 #define SHAPE_H
 
 #include "tinysim/math/Vec2.h"
+#include "tinysim/collision/Feature.h"
 
 enum class ShapeType {
     CIRCLE,
@@ -19,7 +20,7 @@ class Shape {
         void setType(ShapeType t) { type = t; } // Setter for the shape type
 
         virtual Vec2 support(const Vec2 &direction, const Vec2 &position, float orientation) const = 0; // Function to get the point on the shape farthest in a given direction
-
+        virtual Feature supportFeature(const Vec2 &direction, const Vec2 &position, float orientation) const = 0;
 
     private:
         ShapeType type; // Type of the shape (CIRCLE, RECTANGLE, POLYGON)

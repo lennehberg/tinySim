@@ -3,7 +3,6 @@
 #include "tinysim/math/Vec2.h"
 #include "tinysim/collision/GJK.h"
 #include <cstddef>
-#include <cmath>
 #include <limits>
 #include <assert.h>
 
@@ -63,7 +62,7 @@ Edge findClosestEdge(const std::vector<Vec2> &polytope) {
         }
 
         Vec2 n(e.getY(), -e.getX()); // Perpendicular to edge
-        n = n * (1.0f / std::sqrt(d2(n))); // Normalize the normal
+        n = n.normalize(); // Normalize the normal
 
         // compute the distance from the origin to the edge along the normal
         float distance = dot(n, a);

@@ -1,5 +1,6 @@
 #include "tinysim/math/Vec2.h"
 #include <stdexcept>
+#include <cmath>
 
 
 Vec2::Vec2() : x(0), y(0) {}
@@ -72,4 +73,13 @@ Vec2 cross(float s, const Vec2& v)
 
 float d2(const Vec2& v) {
     return dot(v, v);
+}
+
+Vec2 Vec2::normalize() const {
+    float lengthSquared = d2(*this);
+    if (lengthSquared < EPS_SQUARED) {
+        throw std::runtime_error("Cannot normalize a zero-length vector");
+    }
+    float invLength = 1.0f / std::sqrt(lengthSquared);
+    return *this * invLength;
 }

@@ -7,6 +7,9 @@ class BoxShape : public Shape {
   private:
     float width;  // Width of the box
     float height; // Height of the box
+
+    Vec2 findFurthestPointInDirection(const Vec2 &direction) const;
+
   public:
     BoxShape(float width, float height) : width(width), height(height) {
         setType(ShapeType::RECTANGLE); // Set the shape type to RECTANGLE
@@ -20,6 +23,7 @@ class BoxShape : public Shape {
     float getHeight() const { return height; }
 
     Vec2 support(const Vec2 &direction, const Vec2 &position, float orientation) const override;
+    Feature supportFeature(const Vec2 &direction, const Vec2 &position, float orientation) const override;
 };
 
 #endif // BOX_SHAPE_H

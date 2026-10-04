@@ -152,3 +152,36 @@ TEST(Vec2, SquaredMagnitudeIsNeverNegative) {
     CHECK(d2(Vec2(-3.0f, -4.0f)) >= 0.0f);
     CHECK_FLOAT_EQ(d2(Vec2(-3.0f, -4.0f)), 25.0f);
 }
+
+// --- normalize --------------------------------------------------------------
+
+TEST(Vec2, NormalizeGivesUnitLength) {
+    CHECK_FLOAT_EQ(d2(Vec2(3.0f, 4.0f).normalize()), 1.0f);
+    CHECK_FLOAT_EQ(d2(Vec2(-0.01f, 0.02f).normalize()), 1.0f);
+    CHECK_FLOAT_EQ(d2(Vec2(1.0e4f, -2.0e4f).normalize()), 1.0f);
+}
+
+TEST(Vec2, NormalizePreservesDirection) {
+    CHECK_VEC_NEAR(Vec2(3.0f, 4.0f).normalize(), 0.6f, 0.8f);
+    CHECK_VEC_NEAR(Vec2(0.0f, -5.0f).normalize(), 0.0f, -1.0f);
+}
+
+TEST(Vec2, NormalizeOfUnitVectorIsUnchanged) {
+    CHECK_VEC_NEAR(Vec2(1.0f, 0.0f).normalize(), 1.0f, 0.0f);
+}
+
+// normalize() returns a new vector; the original keeps its length.
+TEST(Vec2, NormalizeDoesNotModifyTheOriginal) {
+    const Vec2 v(3.0f, 4.0f);
+    (void)v.normalize();
+    CHECK_VEC_NEAR(v, 3.0f, 4.0f);
+}
+
+TEST(Vec2, NormalizeOfZeroVectorThrows) {
+    CHECK_THROWS(Vec2().normalize(), std::runtime_error);
+}
+
+// Anything shorter than EPS is treated as zero length.
+TEST(Vec2, NormalizeOfNearZeroVectorThrows) {
+    CHECK_THROWS(Vec2(1e-7f, 0.0f).normalize(), std::runtime_error);
+}
